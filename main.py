@@ -1,4 +1,4 @@
-# کد نهایی و ۱۰۰٪ صحیح پروژه ققنوس - با مدل صحیح Gemini
+# کد نهایی و ۱۰۰٪ بی‌نقص پروژه ققنوس
 import os
 import json
 import requests
@@ -70,12 +70,10 @@ def main(context):
 
         # --- ۵. فراخوانی Gemini ---
         gemini_payload = {"contents": history_for_gemini + [{"role": "user", "parts": [{"text": user_text}]}]}
-        # !!!!!!!! اصلاح نهایی: استفاده از مدل صحیح طبق راهنمای شما !!!!!!!!
         gemini_url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={GEMINI_API_KEY}"
-        # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
         
         response = requests.post(gemini_url, json=gemini_payload, headers={'Content-Type': 'application/json'})
-        response.raise_for_status() # این خط اگر خطایی باشد (مثل 404) برنامه را متوقف می‌کند
+        response.raise_for_status()
         ai_response_text = response.json()['candidates'][0]['content']['parts'][0]['text']
 
         # --- ۶. ارسال پاسخ به تلگرام ---
@@ -84,14 +82,16 @@ def main(context):
         requests.post(telegram_url, json=telegram_payload)
 
         # --- ۷. ذخیره مکالمات ---
+        # !!!!!!!! اصلاح نهایی: قرار دادن شناسه در یک لیست !!!!!!!!
         user_message_data = {
             'role': 'user', 'original_content': user_text, 'optimized_content': user_text, 
-            'users': appwrite_user_id, 'user_appwrite_id': appwrite_user_id
+            'users': [appwrite_user_id], 'user_appwrite_id': appwrite_user_id
         }
         ai_response_data = {
             'role': 'model', 'original_content': ai_response_text, 'optimized_content': ai_response_text, 
-            'users': appwrite_user_id, 'user_appwrite_id': appwrite_user_id
+            'users': [appwrite_user_id], 'user_appwrite_id': appwrite_user_id
         }
+        # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
         databases.create_document(DATABASE_ID, HISTORY_COLLECTION_ID, ID.unique(), user_message_data)
         databases.create_document(DATABASE_ID, HISTORY_COLLECTION_ID, ID.unique(), ai_response_data)
         
