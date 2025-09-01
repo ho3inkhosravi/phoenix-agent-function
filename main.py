@@ -1,4 +1,4 @@
-# کد نهایی و کاملاً سازگار با تمام نسخه‌های رانتایم Appwrite
+# کد نهایی - با حذف خط اضافی json.loads
 import os
 import json
 import requests
@@ -7,13 +7,11 @@ from appwrite.services.databases import Databases
 from appwrite.id import ID
 from appwrite.query import Query
 
-# امضای تابع درست است: def main(context)
 def main(context):
     try:
-        # استفاده از context.log برای لاگ‌گیری
         context.log("Function execution started successfully.")
         
-        # --- ۱. مقداردهی اولیه با استفاده از os.environ ---
+        # --- ۱. مقداردهی اولیه ---
         client = Client()
         client.set_endpoint(os.environ.get("APPWRITE_ENDPOINT"))
         client.set_project(os.environ.get("APPWRITE_PROJECT_ID"))
@@ -31,7 +29,11 @@ def main(context):
             context.log("Exiting: Request body is empty.")
             return context.res.json({'status': 'ok', 'message': 'Empty body received.'})
 
-        body = json.loads(context.req.body)
+        # !!!!!!!! خط مشکل‌ساز حذف شد !!!!!!!!
+        # body از قبل یک دیکشنری است
+        body = context.req.body
+        # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
         message = body.get("message", {})
         user_id = message.get("from", {}).get("id")
         chat_id = message.get("chat", {}).get("id")
