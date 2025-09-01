@@ -1,3 +1,4 @@
+# --- START OF MODIFIED CODE ---
 import os
 import json
 import requests
@@ -8,6 +9,10 @@ from appwrite.query import Query
 
 # این تابع اصلی است که توسط Appwrite اجرا می‌شود
 def main(req, res):
+    # !!!!!!!! خط جدید برای عیب‌یابی !!!!!!!!
+    print(f"Raw request body received: {req.body}")
+    # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
     # --- ۱. مقداردهی اولیه و خواندن متغیرهای محیطی ---
     try:
         client = Client()
@@ -37,6 +42,7 @@ def main(req, res):
         username = message.get("from", {}).get("username", "")
 
         if not all([user_id, chat_id, user_text]):
+            print("Exiting: Not a standard user text message.")
             return res.json({'status': 'ok', 'message': 'Not a user message.'})
     except Exception as e:
         print(f"Error parsing Telegram webhook: {e}")
@@ -70,13 +76,11 @@ def main(req, res):
         query_limit = Query.limit(10) # دریافت ۱۰ پیام آخر
         response = databases.list_documents(DATABASE_ID, HISTORY_COLLECTION_ID, queries=[query_user, query_order, query_limit])
         
-        # معکوس کردن لیست تا ترتیب پیام‌ها درست شود (قدیمی به جدید)
         documents = reversed(response['documents'])
         for doc in documents:
             history_for_gemini.append({"role": doc['role'], "parts": [{"text": doc['optimized_content']}]})
     except Exception as e:
         print(f"Error getting chat history: {e}")
-        # ادامه می‌دهیم حتی اگر تاریخچه یافت نشد
 
     # --- ۵. آماده‌سازی و فراخوانی Gemini API ---
     gemini_payload = {
@@ -84,7 +88,7 @@ def main(req, res):
     }
     gemini_url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key={GEMINI_API_KEY}"
     
-    ai_response_text = "Sorry, I couldn't process that. Please try again." # پاسخ پیش‌فرض در صورت خطا
+    ai_response_text = "Sorry, I couldn't process that. Please try again."
     try:
         response = requests.post(gemini_url, json=gemini_payload, headers={'Content-Type': 'application/json'})
         response.raise_for_status()
@@ -100,14 +104,12 @@ def main(req, res):
     except Exception as e:
         print(f"Error sending to Telegram: {e}")
 
-    # --- ۷. ذخیره پیام کاربر و پاسخ AI در دیتابیس (به صورت موازی) ---
+    # --- ۷. ذخیره پیام کاربر و پاسخ AI در دیتابیس ---
     try:
-        # ذخیره پیام کاربر
         databases.create_document(
             DATABASE_ID, HISTORY_COLLECTION_ID, ID.unique(),
             {'role': 'user', 'original_content': user_text, 'optimized_content': user_text, 'user': appwrite_user_id}
         )
-        # ذخیره پاسخ مدل
         databases.create_document(
             DATABASE_ID, HISTORY_COLLECTION_ID, ID.unique(),
             {'role': 'model', 'original_content': ai_response_text, 'optimized_content': ai_response_text, 'user': appwrite_user_id}
@@ -116,3 +118,4 @@ def main(req, res):
         print(f"Error saving chat history: {e}")
 
     return res.json({'status': 'ok'})
+# --- END OF MODIFIED CODE ---
