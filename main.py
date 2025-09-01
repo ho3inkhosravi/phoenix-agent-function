@@ -59,9 +59,7 @@ def main(context):
 
         # --- ۴. بازیابی تاریخچه ---
         history_for_gemini = []
-        # !!!!!!!! اصلاح نهایی: جستجو بر اساس فیلد جدید !!!!!!!!
         query_user = Query.equal("user_appwrite_id", appwrite_user_id)
-        # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
         query_order = Query.order_desc("$createdAt")
         query_limit = Query.limit(10)
         response = databases.list_documents(DATABASE_ID, HISTORY_COLLECTION_ID, queries=[query_user, query_order, query_limit])
@@ -79,12 +77,11 @@ def main(context):
         ai_response_text = response.json()['candidates'][0]['content']['parts'][0]['text']
 
         # --- ۶. ارسال پاسخ به تلگرام ---
-        telegram_url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
+        telegram_url = f"https.api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
         telegram_payload = {'chat_id': chat_id, 'text': ai_response_text}
         requests.post(telegram_url, json=telegram_payload)
 
         # --- ۷. ذخیره مکالمات ---
-        # !!!!!!!! اصلاح نهایی: ذخیره شناسه کاربر در فیلد جدید !!!!!!!!
         user_message_data = {
             'role': 'user', 'original_content': user_text, 'optimized_content': user_text, 
             'users': appwrite_user_id, 'user_appwrite_id': appwrite_user_id
@@ -93,7 +90,6 @@ def main(context):
             'role': 'model', 'original_content': ai_response_text, 'optimized_content': ai_response_text, 
             'users': appwrite_user_id, 'user_appwrite_id': appwrite_user_id
         }
-        # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
         databases.create_document(DATABASE_ID, HISTORY_COLLECTION_ID, ID.unique(), user_message_data)
         databases.create_document(DATABASE_ID, HISTORY_COLLECTION_ID, ID.unique(), ai_response_data)
         
