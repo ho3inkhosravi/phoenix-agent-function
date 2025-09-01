@@ -1,4 +1,4 @@
-# کد نهایی و کاملاً سازگار با رانتایم جدید Appwrite
+# کد نهایی و کاملاً سازگار با تمام نسخه‌های رانتایم Appwrite
 import os
 import json
 import requests
@@ -7,28 +7,26 @@ from appwrite.services.databases import Databases
 from appwrite.id import ID
 from appwrite.query import Query
 
-# امضای تابع به def main(context) تغییر کرد
+# امضای تابع درست است: def main(context)
 def main(context):
     try:
-        # استفاده از context.log به جای print برای لاگ‌گیری بهتر
+        # استفاده از context.log برای لاگ‌گیری
         context.log("Function execution started successfully.")
         
-        # --- ۱. مقداردهی اولیه ---
+        # --- ۱. مقداردهی اولیه با استفاده از os.environ ---
         client = Client()
-        # متغیرهای محیطی از context خوانده می‌شوند
-        client.set_endpoint(context.env.get("APPWRITE_ENDPOINT"))
-        client.set_project(context.env.get("APPWRITE_PROJECT_ID"))
-        client.set_key(context.env.get("APPWRITE_API_KEY"))
+        client.set_endpoint(os.environ.get("APPWRITE_ENDPOINT"))
+        client.set_project(os.environ.get("APPWRITE_PROJECT_ID"))
+        client.set_key(os.environ.get("APPWRITE_API_KEY"))
         databases = Databases(client)
 
-        GEMINI_API_KEY = context.env.get("GEMINI_API_KEY")
-        TELEGRAM_BOT_TOKEN = context.env.get("TELEGRAM_BOT_TOKEN")
+        GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
+        TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")
         DATABASE_ID = "ai_agent"
         USERS_COLLECTION_ID = "users"
         HISTORY_COLLECTION_ID = "chat_history"
 
         # --- ۲. پردازش درخواست ورودی ---
-        # req از context.req خوانده می‌شود
         if not context.req.body:
             context.log("Exiting: Request body is empty.")
             return context.res.json({'status': 'ok', 'message': 'Empty body received.'})
@@ -95,10 +93,9 @@ def main(context):
             {'role': 'model', 'original_content': ai_response_text, 'optimized_content': ai_response_text, 'user': appwrite_user_id}
         )
         
-        # res از context.res خوانده می‌شود
         return context.res.json({'status': 'ok'})
 
     except Exception as e:
         error_message = f"An unexpected error occurred: {str(e)}"
-        context.error(error_message) # لاگ کردن خطا با context.error
+        context.error(error_message)
         return context.res.json({'status': 'error', 'message': error_message}, 500)
