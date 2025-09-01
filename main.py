@@ -1,4 +1,3 @@
-# --- START OF MODIFIED CODE ---
 import os
 import json
 import requests
@@ -7,14 +6,14 @@ from appwrite.services.databases import Databases
 from appwrite.id import ID
 from appwrite.query import Query
 
-# این تابع اصلی است که توسط Appwrite اجرا می‌شود
 def main(req, res):
-    # !!!!!!!! خط جدید برای عیب‌یابی !!!!!!!!
-    print(f"Raw request body received: {req.body}")
-    # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-
-    # --- ۱. مقداردهی اولیه و خواندن متغیرهای محیطی ---
+    # --- بلوک عیب‌یابی ضدضربه ---
     try:
+        print("Function execution started.")
+        print(f"Request body type: {type(req.body)}")
+        print(f"Raw request body received: {req.body}")
+
+        # --- ۱. مقداردهی اولیه ---
         client = Client()
         client.set_endpoint(os.environ["APPWRITE_ENDPOINT"])
         client.set_project(os.environ["APPWRITE_PROJECT_ID"])
@@ -27,12 +26,11 @@ def main(req, res):
         USERS_COLLECTION_ID = "users"
         HISTORY_COLLECTION_ID = "chat_history"
 
-    except Exception as e:
-        print(f"Error initializing: {e}")
-        return res.json({'status': 'error', 'message': 'Initialization failed'}, 500)
+        # --- ۲. پردازش درخواست ورودی ---
+        if not req.body:
+            print("Exiting: Request body is empty.")
+            return res.json({'status': 'ok', 'message': 'Empty body received.'})
 
-    # --- ۲. پردازش درخواست ورودی از تلگرام ---
-    try:
         body = json.loads(req.body)
         message = body.get("message", {})
         user_id = message.get("from", {}).get("id")
@@ -44,68 +42,53 @@ def main(req, res):
         if not all([user_id, chat_id, user_text]):
             print("Exiting: Not a standard user text message.")
             return res.json({'status': 'ok', 'message': 'Not a user message.'})
-    except Exception as e:
-        print(f"Error parsing Telegram webhook: {e}")
-        return res.json({'status': 'error', 'message': 'Invalid request body'}, 400)
+        
+        print(f"Processing message from user ID: {user_id}")
 
-    # --- ۳. پیدا کردن یا ایجاد کاربر در Appwrite ---
-    appwrite_user_id = None
-    try:
+        # --- ۳. پیدا کردن یا ایجاد کاربر ---
+        appwrite_user_id = None
         query = Query.equal("userId", user_id)
         response = databases.list_documents(DATABASE_ID, USERS_COLLECTION_ID, queries=[query])
         
         if response['total'] > 0:
             appwrite_user_id = response['documents'][0]['$id']
+            print(f"Found existing user with Appwrite ID: {appwrite_user_id}")
         else:
             new_user_doc = databases.create_document(
-                DATABASE_ID,
-                USERS_COLLECTION_ID,
-                ID.unique(),
+                DATABASE_ID, USERS_COLLECTION_ID, ID.unique(),
                 {'userId': user_id, 'firstName': first_name, 'username': username}
             )
             appwrite_user_id = new_user_doc['$id']
-    except Exception as e:
-        print(f"Error finding/creating user: {e}")
-        return res.json({'status': 'error', 'message': 'Database user operation failed'}, 500)
+            print(f"Created new user with Appwrite ID: {appwrite_user_id}")
 
-    # --- ۴. بازیابی تاریخچه مکالمات ---
-    history_for_gemini = []
-    try:
+        # --- ۴. بازیابی تاریخچه ---
+        history_for_gemini = []
         query_user = Query.equal("user", [appwrite_user_id])
         query_order = Query.order_desc("$createdAt")
-        query_limit = Query.limit(10) # دریافت ۱۰ پیام آخر
+        query_limit = Query.limit(10)
         response = databases.list_documents(DATABASE_ID, HISTORY_COLLECTION_ID, queries=[query_user, query_order, query_limit])
         
         documents = reversed(response['documents'])
         for doc in documents:
             history_for_gemini.append({"role": doc['role'], "parts": [{"text": doc['optimized_content']}]})
-    except Exception as e:
-        print(f"Error getting chat history: {e}")
+        print(f"Retrieved {len(history_for_gemini)} messages from history.")
 
-    # --- ۵. آماده‌سازی و فراخوانی Gemini API ---
-    gemini_payload = {
-        "contents": history_for_gemini + [{"role": "user", "parts": [{"text": user_text}]}]
-    }
-    gemini_url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key={GEMINI_API_KEY}"
-    
-    ai_response_text = "Sorry, I couldn't process that. Please try again."
-    try:
+        # --- ۵. فراخوانی Gemini ---
+        gemini_payload = {"contents": history_for_gemini + [{"role": "user", "parts": [{"text": user_text}]}]}
+        gemini_url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key={GEMINI_API_KEY}"
+        
         response = requests.post(gemini_url, json=gemini_payload, headers={'Content-Type': 'application/json'})
         response.raise_for_status()
         ai_response_text = response.json()['candidates'][0]['content']['parts'][0]['text']
-    except Exception as e:
-        print(f"Error calling Gemini API: {e}")
+        print("Successfully received response from Gemini.")
 
-    # --- ۶. ارسال پاسخ به کاربر در تلگرام ---
-    telegram_url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
-    telegram_payload = {'chat_id': chat_id, 'text': ai_response_text}
-    try:
+        # --- ۶. ارسال پاسخ به تلگرام ---
+        telegram_url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
+        telegram_payload = {'chat_id': chat_id, 'text': ai_response_text}
         requests.post(telegram_url, json=telegram_payload)
-    except Exception as e:
-        print(f"Error sending to Telegram: {e}")
+        print("Successfully sent response to Telegram.")
 
-    # --- ۷. ذخیره پیام کاربر و پاسخ AI در دیتابیس ---
-    try:
+        # --- ۷. ذخیره مکالمات ---
         databases.create_document(
             DATABASE_ID, HISTORY_COLLECTION_ID, ID.unique(),
             {'role': 'user', 'original_content': user_text, 'optimized_content': user_text, 'user': appwrite_user_id}
@@ -114,8 +97,12 @@ def main(req, res):
             DATABASE_ID, HISTORY_COLLECTION_ID, ID.unique(),
             {'role': 'model', 'original_content': ai_response_text, 'optimized_content': ai_response_text, 'user': appwrite_user_id}
         )
-    except Exception as e:
-        print(f"Error saving chat history: {e}")
+        print("Successfully saved conversation to database.")
+        
+        return res.json({'status': 'ok'})
 
-    return res.json({'status': 'ok'})
-# --- END OF MODIFIED CODE ---
+    except Exception as e:
+        # --- بلوک مدیریت خطای جامع ---
+        error_message = f"An unexpected error occurred: {str(e)}"
+        print(error_message)
+        return res.json({'status': 'error', 'message': error_message}, 500)
