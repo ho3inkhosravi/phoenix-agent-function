@@ -1,4 +1,4 @@
-# کد نهایی و ۱۰۰٪ صحیح پروژه ققنوس
+# کد نهایی و ۱۰۰٪ صحیح پروژه ققنوس - با مدل صحیح Gemini
 import os
 import json
 import requests
@@ -70,14 +70,16 @@ def main(context):
 
         # --- ۵. فراخوانی Gemini ---
         gemini_payload = {"contents": history_for_gemini + [{"role": "user", "parts": [{"text": user_text}]}]}
-        gemini_url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key={GEMINI_API_KEY}"
+        # !!!!!!!! اصلاح نهایی: استفاده از مدل صحیح طبق راهنمای شما !!!!!!!!
+        gemini_url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={GEMINI_API_KEY}"
+        # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
         
         response = requests.post(gemini_url, json=gemini_payload, headers={'Content-Type': 'application/json'})
-        response.raise_for_status()
+        response.raise_for_status() # این خط اگر خطایی باشد (مثل 404) برنامه را متوقف می‌کند
         ai_response_text = response.json()['candidates'][0]['content']['parts'][0]['text']
 
         # --- ۶. ارسال پاسخ به تلگرام ---
-        telegram_url = f"https.api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
+        telegram_url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
         telegram_payload = {'chat_id': chat_id, 'text': ai_response_text}
         requests.post(telegram_url, json=telegram_payload)
 
